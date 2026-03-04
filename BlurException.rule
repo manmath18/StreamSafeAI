@@ -1,0 +1,23 @@
+# Faces (Turning these to true will blur faces, effectively censoring kisses)
+FACE_FEMALE = false
+FACE_MALE = false
+
+# Sensual / Moderately Exposed Content
+BELLY_EXPOSED = true
+MALE_BREAST_EXPOSED = true
+FEET_EXPOSED = true
+ARMPITS_EXPOSED = true
+
+# Highly Explicit Content
+FEMALE_GENITALIA_EXPOSED = true
+MALE_GENITALIA_EXPOSED = true
+FEMALE_BREAST_EXPOSED = true
+BUTTOCKS_EXPOSED = true
+ANUS_EXPOSED = true
+
+# Covered Content (Usually left as false, but you can set to true to be extra safe)
+FEMALE_GENITALIA_COVERED = false
+FEMALE_BREAST_COVERED = false
+BUTTOCKS_COVERED = false
+ANUS_COVERED = false
+BELLY_COVERED = false

@@ -1,0 +1,22 @@
+{
+  "output_dir": "",
+  "ffmpeg_path": "ffmpeg",
+  "codec": "mp4v",
+  "delete_frames": true,
+  "enhanced_blur": false,
+  "solid_color": false,
+  "mask_color": [
+    0,
+    0,
+    0
+  ],
+  "include_audio": true,
+  "percent_threshold": 10.0,
+  "count_threshold": 5,
+  "fbr_labels": 2,
+  "fbr_frames": 10,
+  "global_preview_type": "Included",
+  "input_preview_type": "Included",
+  "output_preview_type": "Included",
+  "tree_preview_type": "Included"
+}
