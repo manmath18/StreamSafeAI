@@ -104,3 +104,7 @@ video_output/
 video_outputs/
 safevision_settings.json
 Models/
+
+# AI Model Weights
+*.pt
+*.onnx
