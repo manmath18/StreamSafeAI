@@ -1969,7 +1969,7 @@ class SafeVisionGUI(QMainWindow):
     def init_ui(self):
         """Set up the user interface."""
         # Set window properties
-        self.setWindowTitle("SafeVision Content Filter v2.0")
+        self.setWindowTitle("StreamSafeAI Content Filter v2.0")
         self.setMinimumSize(1400, 1000)
         self.resize(1600, 1100)
         

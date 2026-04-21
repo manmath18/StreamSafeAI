@@ -3,7 +3,7 @@
   "ffmpeg_path": "ffmpeg",
   "codec": "mp4v",
   "delete_frames": true,
-  "enhanced_blur": false,
+  "enhanced_blur": true,
   "solid_color": false,
   "mask_color": [
     0,
