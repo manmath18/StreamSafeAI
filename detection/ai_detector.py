@@ -22,8 +22,10 @@ class SafeVisionEngine(QThread):
         
         # Sliding window aggregator parameters
         self.score_history = []
-        self.W = 15
+        self.W = 8  # Reduced window size for faster responsiveness
         self.decision_tau = 0.60
+        self.kiss_cooldown = 0  # Hold the kissing score to bridge face-detection dropouts
+        self.skin_cooldown = 0  # Hold skin score
         
         # Initialize the real ONNX-based detector
         self.detector = LiveNudeDetector()
@@ -133,18 +135,31 @@ class SafeVisionEngine(QThread):
             upper_skin = np.array([20, 255, 255], dtype=np.uint8)
             skin_mask = cv2.inRange(hsv_frame, lower_skin, upper_skin)
             skin_ratio = cv2.countNonZero(skin_mask) / (frame.shape[0] * frame.shape[1])
-            is_high_skin = skin_ratio > 0.25  # Threshold for high skin exposure
+            is_high_skin = skin_ratio > 0.18  # Lowered threshold to aggressively catch skin exposure
             
             if is_high_skin:
+                self.skin_cooldown = 4
                 has_unsafe = True
-                max_unsafe_score = max(max_unsafe_score, 0.85)
+                max_unsafe_score = max(max_unsafe_score, 0.90)
+            elif self.skin_cooldown > 0:
+                self.skin_cooldown -= 1
+                has_unsafe = True
+                max_unsafe_score = max(max_unsafe_score, 0.90)
             
             # 4. Kissing and Intimate Interaction Detection (Face Proximity)
             frame_height = frame.shape[0]
             tau_f = frame_height * 0.25 # Increased Face-distance threshold proportional to frame height
             is_kiss = False
             
-            if len(faces) >= 2:
+            # Check for wide faces (two faces merged into one box by the detector)
+            for box in faces:
+                if len(box) == 4:
+                    x, y, w, h = box
+                    if h > 0 and (w / h) > 1.35:  # Abnormally wide face bounding box
+                        is_kiss = True
+                        break
+            
+            if not is_kiss and len(faces) >= 2:
                 for i in range(len(faces)):
                     for j in range(i+1, len(faces)):
                         x1, y1, w1, h1 = faces[i]
@@ -154,13 +169,21 @@ class SafeVisionEngine(QThread):
                         dist = np.sqrt((c1x - c2x)**2 + (c1y - c2y)**2)
                         
                         # Use either strict frame proportion or bounding box size heuristics
-                        if dist <= tau_f or dist <= ((w1 + w2) / 1.2):
+                        if dist <= tau_f or dist <= ((w1 + w2) / 1.1):
                             is_kiss = True
-                            has_unsafe = True
-                            max_unsafe_score = max(max_unsafe_score, 0.95)
                             break
                     if is_kiss:
                         break
+
+            # Handle Kiss Cooldown to bridge gaps where faces aren't detected for a few frames
+            if is_kiss:
+                self.kiss_cooldown = 6  # Hold the explicit score for the next 6 frames (~1.2 seconds)
+                has_unsafe = True
+                max_unsafe_score = max(max_unsafe_score, 0.95)
+            elif self.kiss_cooldown > 0:
+                self.kiss_cooldown -= 1
+                has_unsafe = True
+                max_unsafe_score = max(max_unsafe_score, 0.95)
 
             # --- Multi-Modal Frame-Level Classification ---
             S_v = max_unsafe_score if has_unsafe else 0.1

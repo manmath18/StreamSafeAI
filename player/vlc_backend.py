@@ -29,9 +29,9 @@ class VLCBackend:
 
     def play_media(self, filepath):
         if not self.player: return
+        self.player.stop()  # Ensure player is stopped before changing media
         media = self.instance.media_new(filepath)
         self.player.set_media(media)
-        self.player.play()
 
     def play(self):
         if self.player: self.player.play()

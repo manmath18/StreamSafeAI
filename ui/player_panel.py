@@ -180,7 +180,7 @@ class PlayerPanel(QWidget):
         if file_name:
             self.title_label.setText(os.path.basename(file_name))
             self.player.play_media(file_name)
-            self.play_btn.setText("⏸")
+            self.play_btn.setText("▶")
             # Emit signal for metadata extraction
             self.video_loaded.emit(file_name)
             # Start AI Engine
@@ -215,7 +215,17 @@ class PlayerPanel(QWidget):
         return f"{m:02d}:{s:02d}"
 
     def handle_skip_request(self, start_ms, end_ms):
-        self.unsafe_detected.emit(f"Unsafe scene detected at {self.format_time(start_ms)}. Auto-skipping to {self.format_time(end_ms)}...")
+        msg = f"Unsafe scene detected at {self.format_time(start_ms)}. Auto-skipping to {self.format_time(end_ms)}..."
+        self.unsafe_detected.emit(msg)
+        try:
+            from utils.db_manager import log_event
+            # Default to 95.0% confidence for logged skip events
+            file_path = "Unknown"
+            if hasattr(self.player, 'media') and self.player.media is not None:
+                file_path = self.player.media.get_mrl()
+            log_event("AUTO_SKIP", msg, file_path, 95.0)
+        except Exception as e:
+            print("DB Log Error:", e)
         self.player.set_time(end_ms)
 
     def skip_backward(self):

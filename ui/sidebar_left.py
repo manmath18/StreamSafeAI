@@ -52,8 +52,8 @@ class LeftSidebar(QWidget):
         
         # Navigation Buttons
         self.nav_items = [
-            ("Live Stream Player", 0),
-            ("Preprocess & Upload", 1),
+            ("Preprocess & Upload", 0),
+            ("Live Stream Player", 1),
             ("Blur Settings", 2),
             ("Scan Library", 3),
             ("History", 4)

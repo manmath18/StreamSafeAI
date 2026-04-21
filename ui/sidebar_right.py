@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QProgressBar, QFrame
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QProgressBar, QFrame, QStackedWidget
 from PyQt6.QtCore import Qt
 import os
 import cv2
@@ -19,11 +19,36 @@ class RightSidebar(QWidget):
         self.init_ui()
 
     def init_ui(self):
-        layout = QVBoxLayout(self)
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.stack = QStackedWidget()
+        main_layout.addWidget(self.stack)
+        
+        # Page 0: Live Stream Mode
+        self.live_page = QWidget()
+        self.init_live_page()
+        self.stack.addWidget(self.live_page)
+        
+        # Page 1: Batch Process Mode
+        self.batch_page = QWidget()
+        self.init_batch_page()
+        self.stack.addWidget(self.batch_page)
+        
+        self.stack.setCurrentIndex(0)
+        
+    def set_mode(self, mode):
+        if mode == "live":
+            self.stack.setCurrentIndex(0)
+        elif mode == "batch":
+            self.stack.setCurrentIndex(1)
+            
+    def init_live_page(self):
+        layout = QVBoxLayout(self.live_page)
         layout.setContentsMargins(15, 20, 15, 20)
         layout.setSpacing(20)
         
-        title = QLabel("AI Monitor Panel")
+        title = QLabel("AI Monitor Panel (Live)")
         title.setStyleSheet("color: #f8fafc; font-size: 16px; font-weight: bold;")
         layout.addWidget(title)
         
@@ -104,7 +129,70 @@ class RightSidebar(QWidget):
         """)
         layout.addWidget(self.log_area)
         
+        # Model Info
+        layout.addWidget(self._create_separator())
+        model_title = QLabel("Model Metrics")
+        model_title.setStyleSheet("color: #94a3b8; font-size: 14px; font-weight: bold;")
+        layout.addWidget(model_title)
+        
+        self.model_acc_label = QLabel("Real-time Confidence: --%")
+        self.model_status_label = QLabel("Late-Fusion Engine: Active")
+        self.window_size_label = QLabel("Aggregator Window: 8 frames")
+        
+        for lbl in [self.model_acc_label, self.model_status_label, self.window_size_label]:
+            lbl.setStyleSheet("color: #cbd5e1; font-size: 13px;")
+            layout.addWidget(lbl)
+            
         layout.addStretch()
+
+    def init_batch_page(self):
+        layout = QVBoxLayout(self.batch_page)
+        layout.setContentsMargins(15, 20, 15, 20)
+        layout.setSpacing(20)
+        
+        title = QLabel("Batch Processing Panel")
+        title.setStyleSheet("color: #f8fafc; font-size: 16px; font-weight: bold;")
+        layout.addWidget(title)
+        
+        # Model Metrics
+        model_title = QLabel("Model Metrics")
+        model_title.setStyleSheet("color: #94a3b8; font-size: 14px; font-weight: bold;")
+        layout.addWidget(model_title)
+        
+        self.batch_model_acc_label = QLabel("Late-Fusion Engine: Active")
+        self.batch_window_size_label = QLabel("Aggregator Window: 8 frames")
+        
+        for lbl in [self.batch_model_acc_label, self.batch_window_size_label]:
+            lbl.setStyleSheet("color: #cbd5e1; font-size: 13px;")
+            layout.addWidget(lbl)
+            
+        layout.addWidget(self._create_separator())
+        
+        # Processing Logs
+        log_title = QLabel("Processing Logs")
+        log_title.setStyleSheet("color: #94a3b8; font-size: 14px; font-weight: bold;")
+        layout.addWidget(log_title)
+        
+        from PyQt6.QtWidgets import QTextEdit
+        self.batch_log_area = QTextEdit()
+        self.batch_log_area.setReadOnly(True)
+        self.batch_log_area.setStyleSheet("""
+            QTextEdit {
+                background-color: #0f172a;
+                color: #cbd5e1;
+                border: 1px solid #334155;
+                border-radius: 4px;
+                font-family: monospace;
+                font-size: 12px;
+            }
+        """)
+        layout.addWidget(self.batch_log_area)
+        
+    def log_batch(self, msg):
+        if hasattr(self, 'batch_log_area'):
+            self.batch_log_area.append(msg)
+            scrollbar = self.batch_log_area.verticalScrollBar()
+            scrollbar.setValue(scrollbar.maximum())
 
     def log_skip(self, msg):
         self.log_area.append(msg)
@@ -159,6 +247,7 @@ class RightSidebar(QWidget):
     def update_stats(self, score, fps, is_safe):
         self.risk_bar.setValue(int(score * 100))
         self.fps_label.setText(f"Extraction FPS: {fps:.1f}")
+        self.model_acc_label.setText(f"Real-time Confidence: {(score * 100):.1f}%")
         
         if is_safe:
             self.status_badge.setText("SAFE")
