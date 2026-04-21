@@ -21,6 +21,56 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
 from PyQt5.QtGui import QPixmap, QImage, QPalette, QColor, QIcon, QFont, QPainter, QTextCharFormat, QTextCursor
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer, QObject
 import cv2
+from video_trimmer import VideoTrimmer
+
+class TrimmerWorker(QThread):
+    progress_update = pyqtSignal(float, str)
+    finished = pyqtSignal(bool, str, object)
+    
+    def __init__(self, trimmer, action):
+        super().__init__()
+        self.trimmer = trimmer
+        self.action = action
+        
+    def callback(self, pct, msg):
+        self.progress_update.emit(pct, msg)
+        
+    def run(self):
+        try:
+            if self.action == "analyze":
+                res = self.trimmer.analyze(callback=self.callback)
+                self.finished.emit(True, "Analysis complete", res)
+            elif self.action == "trim":
+                out_path = self.trimmer.trim(callback=self.callback)
+                self.finished.emit(True, "Trim complete", out_path)
+        except Exception as e:
+            self.finished.emit(False, str(e), None)
+
+class TimelineWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.segments = []
+        self.total_duration = 1.0
+        self.setMinimumHeight(40)
+        
+    def set_data(self, segments, duration):
+        self.segments = segments
+        self.total_duration = duration if duration > 0 else 1.0
+        self.update()
+        
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        w, h = self.width(), self.height()
+        painter.fillRect(0, 0, w, h, QColor("#e9ecef"))
+        
+        for seg in self.segments:
+            start_pct = seg["start"] / self.total_duration
+            end_pct = seg["end"] / self.total_duration
+            x = int(start_pct * w)
+            width = int((end_pct - start_pct) * w)
+            
+            color = QColor("#22c55e") if seg["type"] == "safe" else QColor("#ef4444")
+            painter.fillRect(x, 0, width, h, color)
 
 class WorkerSignals(QObject):
     """Defines signals available for worker threads."""
@@ -2163,6 +2213,10 @@ class SafeVisionGUI(QMainWindow):
         advanced_tab = self.create_advanced_options_tab()
         options_tabs.addTab(advanced_tab, "🔧 Advanced")
         
+        # Smart Trim tab
+        smart_trim_tab = self.create_smart_trim_tab()
+        options_tabs.addTab(smart_trim_tab, "✂️ Smart Trim")
+        
         layout.addWidget(options_tabs)
         
         # Process button and progress
@@ -2966,6 +3020,91 @@ class SafeVisionGUI(QMainWindow):
             
         except Exception as e:
             QMessageBox.warning(self, "Restore Error", f"Failed to restore UI: {str(e)}")
+
+    def create_smart_trim_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        
+        info_label = QLabel("Analyze video to find unsafe segments, then trim them out seamlessly.")
+        info_label.setWordWrap(True)
+        layout.addWidget(info_label)
+        
+        btn_layout = QHBoxLayout()
+        self.analyze_btn = QPushButton("🔍 Start Deep Analysis")
+        self.analyze_btn.clicked.connect(self.start_trim_analysis)
+        self.analyze_btn.setStyleSheet("background-color: #3b82f6; color: white; padding: 10px; border-radius: 5px; font-weight: bold;")
+        
+        self.trim_btn = QPushButton("✂️ Trim & Save Video")
+        self.trim_btn.clicked.connect(self.start_video_trim)
+        self.trim_btn.setEnabled(False)
+        self.trim_btn.setStyleSheet("background-color: #10b981; color: white; padding: 10px; border-radius: 5px; font-weight: bold;")
+        
+        btn_layout.addWidget(self.analyze_btn)
+        btn_layout.addWidget(self.trim_btn)
+        layout.addLayout(btn_layout)
+        
+        self.trim_progress = QProgressBar()
+        self.trim_progress.setValue(0)
+        layout.addWidget(self.trim_progress)
+        
+        self.trim_status = QLabel("Ready")
+        layout.addWidget(self.trim_status)
+        
+        layout.addWidget(QLabel("<b>Scene Timeline</b> (Green=Safe, Red=Unsafe):"))
+        self.timeline_widget = TimelineWidget()
+        layout.addWidget(self.timeline_widget)
+        
+        layout.addStretch()
+        return tab
+        
+    def start_trim_analysis(self):
+        if not self.input_path or not os.path.isfile(self.input_path):
+            QMessageBox.warning(self, "Error", "Please select a valid input video file first.")
+            return
+            
+        self.trim_progress.setValue(0)
+        self.trim_status.setText("Initializing analysis...")
+        self.analyze_btn.setEnabled(False)
+        self.trim_btn.setEnabled(False)
+        
+        self.trimmer = VideoTrimmer(self.input_path)
+        self.trim_worker = TrimmerWorker(self.trimmer, "analyze")
+        self.trim_worker.progress_update.connect(lambda p, m: (self.trim_progress.setValue(int(p)), self.trim_status.setText(m)))
+        self.trim_worker.finished.connect(self.on_analysis_finished)
+        self.trim_worker.start()
+        
+    def on_analysis_finished(self, success, msg, res):
+        self.analyze_btn.setEnabled(True)
+        if success:
+            self.trim_status.setText(f"Analysis complete: {res['unsafe_count']} unsafe scenes found.")
+            self.timeline_widget.set_data(res['segments'], res['total_duration'])
+            self.trim_btn.setEnabled(True)
+        else:
+            self.trim_status.setText(f"Analysis failed: {msg}")
+            
+    def start_video_trim(self):
+        if not hasattr(self, 'trimmer') or self.trimmer is None:
+            return
+            
+        self.trim_progress.setValue(0)
+        self.trim_status.setText("Initializing trim...")
+        self.analyze_btn.setEnabled(False)
+        self.trim_btn.setEnabled(False)
+        
+        self.trim_worker = TrimmerWorker(self.trimmer, "trim")
+        self.trim_worker.progress_update.connect(lambda p, m: (self.trim_progress.setValue(int(p)), self.trim_status.setText(m)))
+        self.trim_worker.finished.connect(self.on_trim_finished)
+        self.trim_worker.start()
+        
+    def on_trim_finished(self, success, msg, out_path):
+        self.analyze_btn.setEnabled(True)
+        self.trim_btn.setEnabled(True)
+        if success:
+            self.trim_status.setText(f"Trim complete! Saved to {out_path}")
+            QMessageBox.information(self, "Success", f"Trimmed video saved successfully to:\n{out_path}")
+        else:
+            self.trim_status.setText(f"Trim failed: {msg}")
+            QMessageBox.critical(self, "Error", f"Trimming failed:\n{msg}")
 
     def create_advanced_options_tab(self):
         """Create the advanced options tab."""

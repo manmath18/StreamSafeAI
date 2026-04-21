@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeVision | Modern AI Video Analysis</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+
+        :root {
+            --bg-color: #0f172a;
+            --glass-bg: rgba(30, 41, 59, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --primary: #38bdf8;
+            --primary-hover: #0284c7;
+            --safe-color: #22c55e;
+            --unsafe-color: #ef4444;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background: var(--bg-color);
+            background-image: radial-gradient(circle at 15% 50%, rgba(56, 189, 248, 0.15), transparent 25%),
+                              radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.15), transparent 25%);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+        }
+
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 30px;
+            width: 100%;
+            max-width: 900px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+
+        h1 {
+            font-weight: 700;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-align: center;
+            background: linear-gradient(to right, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: var(--text-muted);
+            margin-bottom: 30px;
+            font-size: 1.1rem;
+        }
+
+        /* Upload Area */
+        .upload-area {
+            border: 2px dashed var(--glass-border);
+            border-radius: 12px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+        }
+
+        .upload-area:hover, .upload-area.dragover {
+            border-color: var(--primary);
+            background: rgba(56, 189, 248, 0.05);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            color: var(--primary);
+        }
+
+        #file-input { display: none; }
+
+        /* Tabs */
+        .tabs {
+            display: none;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--glass-border);
+            padding-bottom: 10px;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 10px 20px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .tab-btn.active {
+            color: var(--primary);
+            background: rgba(56, 189, 248, 0.1);
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.4s ease;
+        }
+        .tab-content.active { display: block; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Video / Stream */
+        .video-container {
+            width: 100%;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--glass-border);
+            position: relative;
+        }
+
+        .video-container img {
+            width: 100%;
+            display: block;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+        }
+
+        select, button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        select {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+            outline: none;
+        }
+
+        select option { background: var(--bg-color); }
+
+        button:hover { background: var(--primary-hover); }
+        
+        button:disabled {
+            background: var(--text-muted);
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        /* Timeline Slider */
+        input[type="range"] {
+            flex-grow: 1;
+            -webkit-appearance: none;
+            height: 6px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 3px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--primary);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--primary);
+        }
+
+        /* Analysis Timeline */
+        .analysis-timeline {
+            margin-top: 20px;
+            height: 24px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            display: flex;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .segment {
+            height: 100%;
+            transition: background 0.3s;
+        }
+        
+        .segment.safe { background: var(--safe-color); opacity: 0.8; }
+        .segment.unsafe { background: var(--unsafe-color); opacity: 0.9; }
+
+        /* Progress Bar */
+        .progress-wrapper {
+            margin-top: 20px;
+            display: none;
+        }
+        .progress-bar {
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--primary);
+            transition: width 0.3s;
+        }
+        .status-text {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-top: 5px;
+            text-align: right;
+        }
+
+        /* File Info */
+        #file-info {
+            display: none;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: rgba(56, 189, 248, 0.1);
+            border-radius: 8px;
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="glass-panel">
+        <h1>SafeVision</h1>
+        <p class="subtitle">AI-Powered Media Safety & Trimming Engine</p>
+
+        <!-- Upload Section -->
+        <div id="upload-section" class="upload-area" onclick="document.getElementById('file-input').click()">
+            <div class="upload-icon">📁</div>
+            <h3>Drag & Drop or Click to Upload Video</h3>
+            <p style="color: var(--text-muted); margin-top: 5px;">Supports MP4, AVI, MKV</p>
+            <input type="file" id="file-input" accept="video/*">
+        </div>
+
+        <div id="file-info"></div>
+
+        <!-- Tabs Navigation -->
+        <div class="tabs" id="tabs-nav">
+            <button class="tab-btn active" onclick="switchTab('stream')">Live Stream</button>
+            <button class="tab-btn" onclick="switchTab('analyze')">Analyze & Trim</button>
+        </div>
+
+        <!-- Tab: Stream -->
+        <div id="tab-stream" class="tab-content active">
+            <div style="margin-bottom: 15px;">
+                <label style="margin-right: 10px;">Mode:</label>
+                <select id="stream-mode" onchange="updateStream()">
+                    <option value="blur">Dynamic Blur</option>
+                    <option value="skip">Seamless Skip (requires Analyze first)</option>
+                </select>
+            </div>
+            
+            <div class="video-container">
+                <img id="video-stream" src="" alt="Video stream will appear here" style="display: none;">
+            </div>
+
+            <div class="controls">
+                <button id="play-pause" onclick="togglePause()">Pause</button>
+                <input type="range" id="timeline" min="0" max="100" value="0" step="0.1">
+                <span id="time-display" style="min-width: 50px;">0.0%</span>
+            </div>
+        </div>
+
+        <!-- Tab: Analyze & Trim -->
+        <div id="tab-analyze" class="tab-content">
+            <p style="margin-bottom: 15px; color: var(--text-muted);">
+                Scan the video to detect unsafe segments. Once analyzed, you can download a clean, trimmed version or use Seamless Skip in the Stream tab.
+            </p>
+            
+            <button id="btn-analyze" onclick="startAnalysis()">Start Deep Analysis</button>
+
+            <div class="progress-wrapper" id="analysis-progress">
+                <div>Analysis Progress</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="analysis-fill"></div>
+                </div>
+                <div class="status-text" id="analysis-status">Preparing...</div>
+            </div>
+
+            <div style="margin-top: 30px;">
+                <h3 style="margin-bottom: 10px;">Scene Timeline</h3>
+                <div class="analysis-timeline" id="scene-timeline">
+                    <!-- Segments will be injected here -->
+                </div>
+                <div style="display: flex; gap: 15px; margin-top: 10px; font-size: 0.85rem; color: var(--text-muted);">
+                    <span style="display: flex; align-items: center; gap: 5px;">
+                        <div style="width: 12px; height: 12px; background: var(--safe-color); border-radius: 3px;"></div> Safe
+                    </span>
+                    <span style="display: flex; align-items: center; gap: 5px;">
+                        <div style="width: 12px; height: 12px; background: var(--unsafe-color); border-radius: 3px;"></div> Unsafe / Obscene
+                    </span>
+                </div>
+            </div>
+
+            <div style="margin-top: 30px; border-top: 1px solid var(--glass-border); padding-top: 20px;">
+                <button id="btn-trim" onclick="startTrim()" disabled>Trim & Download Video</button>
+                <a id="download-link" style="display: none; margin-left: 15px; color: var(--primary); text-decoration: none; font-weight: bold;">⬇️ Download Result</a>
+                
+                <div class="progress-wrapper" id="trim-progress">
+                    <div style="margin-top: 15px;">Trim Progress</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="trim-fill"></div>
+                    </div>
+                    <div class="status-text" id="trim-status">Processing...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentFilename = null;
+        let isDragging = false;
+        let statusInterval = null;
+
+        // UI Elements
+        const fileInput = document.getElementById('file-input');
+        const uploadArea = document.getElementById('upload-section');
+        const fileInfo = document.getElementById('file-info');
+        const tabsNav = document.getElementById('tabs-nav');
+        
+        // Drag and drop events
+        uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            if(e.dataTransfer.files.length) handleUpload(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', (e) => {
+            if(e.target.files.length) handleUpload(e.target.files[0]);
+        });
+
+        function handleUpload(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            uploadArea.innerHTML = `<h3>Uploading ${file.name}...</h3>`;
+
+            fetch('/upload', { method: 'POST', body: formData })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        currentFilename = data.filename;
+                        uploadArea.style.display = 'none';
+                        fileInfo.style.display = 'block';
+                        fileInfo.innerText = `🎥 Loaded: ${currentFilename}`;
+                        tabsNav.style.display = 'flex';
+                        
+                        updateStream();
+                        startStatusPolling();
+                    }
+                });
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+        }
+
+        // Stream Functions
+        function updateStream() {
+            if(!currentFilename) return;
+            const mode = document.getElementById('stream-mode').value;
+            const img = document.getElementById('video-stream');
+            img.src = `/video_feed/${currentFilename}?mode=${mode}&t=${Date.now()}`;
+            img.style.display = 'block';
+        }
+
+        function togglePause() {
+            fetch(`/toggle_pause/${currentFilename}`, { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('play-pause').innerText = data.paused ? "Play" : "Pause";
+                });
+        }
+
+        const timeline = document.getElementById('timeline');
+        timeline.addEventListener('mousedown', () => isDragging = true);
+        timeline.addEventListener('input', () => {
+            document.getElementById('time-display').innerText = parseFloat(timeline.value).toFixed(1) + '%';
+        });
+        timeline.addEventListener('mouseup', () => {
+            fetch(`/seek/${currentFilename}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ pct: parseFloat(timeline.value) })
+            }).then(() => isDragging = false);
+        });
+
+        function startStatusPolling() {
+            if(statusInterval) clearInterval(statusInterval);
+            statusInterval = setInterval(() => {
+                if(!isDragging && currentFilename) {
+                    fetch(`/status/${currentFilename}`)
+                        .then(r => r.json())
+                        .then(data => {
+                            timeline.value = data.pct;
+                            document.getElementById('time-display').innerText = data.pct.toFixed(1) + '%';
+                            document.getElementById('play-pause').innerText = data.paused ? "Play" : "Pause";
+                        }).catch(()=>{});
+                }
+            }, 1000);
+        }
+
+        // Analysis Functions
+        let analysisInterval = null;
+        
+        function startAnalysis() {
+            if(!currentFilename) return;
+            document.getElementById('btn-analyze').disabled = true;
+            document.getElementById('analysis-progress').style.display = 'block';
+            
+            fetch(`/analyze/${currentFilename}`, { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    analysisInterval = setInterval(pollAnalysis, 1000);
+                });
+        }
+
+        function pollAnalysis() {
+            fetch(`/analyze_status/${currentFilename}`)
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('analysis-fill').style.width = `${data.progress}%`;
+                    document.getElementById('analysis-status').innerText = data.message || `${data.progress}%`;
+                    
+                    if(data.status === 'done') {
+                        clearInterval(analysisInterval);
+                        document.getElementById('analysis-status').innerText = "Analysis Complete!";
+                        document.getElementById('btn-trim').disabled = false;
+                        renderTimeline(data.segments);
+                    } else if(data.status === 'error') {
+                        clearInterval(analysisInterval);
+                        document.getElementById('analysis-status').innerText = "Error during analysis.";
+                        document.getElementById('analysis-status').style.color = "var(--unsafe-color)";
+                    }
+                });
+        }
+
+        function renderTimeline(segments) {
+            const container = document.getElementById('scene-timeline');
+            container.innerHTML = '';
+            
+            if(!segments || segments.length === 0) return;
+            
+            const totalDuration = segments[segments.length - 1].end;
+            
+            segments.forEach(seg => {
+                const duration = seg.end - seg.start;
+                const widthPct = (duration / totalDuration) * 100;
+                
+                const div = document.createElement('div');
+                div.className = `segment ${seg.type}`;
+                div.style.width = `${widthPct}%`;
+                div.title = `${seg.type.toUpperCase()} (${seg.start}s - ${seg.end}s)`;
+                
+                container.appendChild(div);
+            });
+        }
+
+        // Trim Functions
+        let trimInterval = null;
+
+        function startTrim() {
+            if(!currentFilename) return;
+            document.getElementById('btn-trim').disabled = true;
+            document.getElementById('trim-progress').style.display = 'block';
+            
+            fetch(`/trim/${currentFilename}`, { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    trimInterval = setInterval(pollTrim, 1000);
+                });
+        }
+
+        function pollTrim() {
+            fetch(`/analyze_status/${currentFilename}`)
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('trim-fill').style.width = `${data.progress}%`;
+                    document.getElementById('trim-status').innerText = data.message || `${data.progress}%`;
+                    
+                    if(data.status === 'done') {
+                        clearInterval(trimInterval);
+                        document.getElementById('trim-status').innerText = "Trim Complete!";
+                        const link = document.getElementById('download-link');
+                        link.href = `/download/${currentFilename}`;
+                        link.style.display = 'inline-block';
+                    } else if(data.status === 'error') {
+                        clearInterval(trimInterval);
+                        document.getElementById('trim-status').innerText = "Error during trimming.";
+                        document.getElementById('trim-status').style.color = "var(--unsafe-color)";
+                    }
+                });
+        }
+
+    </script>
+</body>
+</html>
