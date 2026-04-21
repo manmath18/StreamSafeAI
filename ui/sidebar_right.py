@@ -83,8 +83,33 @@ class RightSidebar(QWidget):
         for lbl in [self.file_size_label, self.resolution_label, self.bitrate_label, self.codec_label]:
             lbl.setStyleSheet("color: #cbd5e1; font-size: 13px;")
             layout.addWidget(lbl)
+            
+        layout.addWidget(self._create_separator())
+        log_title = QLabel("Skipping Logs")
+        log_title.setStyleSheet("color: #94a3b8; font-size: 14px; font-weight: bold;")
+        layout.addWidget(log_title)
+        
+        from PyQt6.QtWidgets import QTextEdit
+        self.log_area = QTextEdit()
+        self.log_area.setReadOnly(True)
+        self.log_area.setStyleSheet("""
+            QTextEdit {
+                background-color: #0f172a;
+                color: #cbd5e1;
+                border: 1px solid #334155;
+                border-radius: 4px;
+                font-family: monospace;
+                font-size: 12px;
+            }
+        """)
+        layout.addWidget(self.log_area)
         
         layout.addStretch()
+
+    def log_skip(self, msg):
+        self.log_area.append(msg)
+        scrollbar = self.log_area.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
 
     def _create_separator(self):
         line = QFrame()

@@ -8,6 +8,82 @@ from ui.sidebar_left import LeftSidebar
 from ui.sidebar_right import RightSidebar
 from ui.bottom_panel import BottomPanel
 
+class PreprocessPanel(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setStyleSheet("background-color: #020617; color: white;")
+        layout = QVBoxLayout(self)
+        title = QLabel("Preprocess & Upload")
+        title.setStyleSheet("font-size: 24px; font-weight: bold; margin-bottom: 20px;")
+        layout.addWidget(title)
+        
+        btn = QPushButton("Select Video for Batch Processing")
+        btn.setStyleSheet("background-color: #3b82f6; padding: 10px; border-radius: 5px;")
+        layout.addWidget(btn)
+        
+        self.status = QLabel("Ready for upload.")
+        layout.addWidget(self.status)
+        layout.addStretch()
+
+class BlurSettingsPanel(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setStyleSheet("background-color: #020617; color: white;")
+        layout = QVBoxLayout(self)
+        title = QLabel("Blur Settings")
+        title.setStyleSheet("font-size: 24px; font-weight: bold; margin-bottom: 20px;")
+        layout.addWidget(title)
+        
+        from PyQt6.QtWidgets import QCheckBox, QSlider
+        self.cb1 = QCheckBox("Blur Nudity")
+        self.cb1.setChecked(True)
+        self.cb2 = QCheckBox("Blur Kissing/Intimacy")
+        self.cb2.setChecked(True)
+        layout.addWidget(self.cb1)
+        layout.addWidget(self.cb2)
+        
+        layout.addWidget(QLabel("Blur Intensity:"))
+        slider = QSlider(Qt.Orientation.Horizontal)
+        slider.setRange(1, 50)
+        slider.setValue(23)
+        layout.addWidget(slider)
+        
+        layout.addStretch()
+
+class ScanLibraryPanel(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setStyleSheet("background-color: #020617; color: white;")
+        layout = QVBoxLayout(self)
+        title = QLabel("Scan Library")
+        title.setStyleSheet("font-size: 24px; font-weight: bold; margin-bottom: 20px;")
+        layout.addWidget(title)
+        
+        btn = QPushButton("Select Directory to Scan")
+        btn.setStyleSheet("background-color: #10b981; padding: 10px; border-radius: 5px;")
+        layout.addWidget(btn)
+        
+        from PyQt6.QtWidgets import QListWidget
+        self.list = QListWidget()
+        self.list.setStyleSheet("background-color: #0f172a; border: 1px solid #334155;")
+        layout.addWidget(self.list)
+
+class HistoryPanel(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setStyleSheet("background-color: #020617; color: white;")
+        layout = QVBoxLayout(self)
+        title = QLabel("Scan History")
+        title.setStyleSheet("font-size: 24px; font-weight: bold; margin-bottom: 20px;")
+        layout.addWidget(title)
+        
+        from PyQt6.QtWidgets import QTableWidget
+        self.table = QTableWidget(0, 3)
+        self.table.setHorizontalHeaderLabels(["Date", "File", "Threats Found"])
+        self.table.setStyleSheet("background-color: #0f172a; border: 1px solid #334155;")
+        layout.addWidget(self.table)
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -46,19 +122,19 @@ class MainWindow(QMainWindow):
         self.center_stack.addWidget(self.player_panel)
         
         # Tab 1: Preprocess & Upload
-        self.preprocess_panel = self._create_placeholder("Preprocess & Upload Area\n\nUpload a video for batch processing, scanning, and generating a clean trimmed version.")
+        self.preprocess_panel = PreprocessPanel()
         self.center_stack.addWidget(self.preprocess_panel)
         
         # Tab 2: Blur Settings
-        self.blur_settings_panel = self._create_placeholder("Blur Settings Configuration\n\nToggle which explicit content classes to blur and set blur strength thresholds.")
+        self.blur_settings_panel = BlurSettingsPanel()
         self.center_stack.addWidget(self.blur_settings_panel)
         
         # Tab 3: Scan Library
-        self.scan_lib_panel = self._create_placeholder("Scan Library\n\nBatch scan multiple media files in a directory.")
+        self.scan_lib_panel = ScanLibraryPanel()
         self.center_stack.addWidget(self.scan_lib_panel)
 
         # Tab 4: History
-        self.history_panel = self._create_placeholder("Scan History\n\nView previous detections and video reports.")
+        self.history_panel = HistoryPanel()
         self.center_stack.addWidget(self.history_panel)
         
         self.content_splitter.addWidget(self.center_stack)
@@ -80,6 +156,7 @@ class MainWindow(QMainWindow):
         self.left_sidebar.tab_selected.connect(self.center_stack.setCurrentIndex)
         self.player_panel.frame_extracted.connect(self.right_sidebar.update_stats)
         self.player_panel.unsafe_detected.connect(self.bottom_panel.log_event)
+        self.player_panel.unsafe_detected.connect(self.right_sidebar.log_skip)
         self.player_panel.video_loaded.connect(self.right_sidebar.update_metadata)
 
     def _create_placeholder(self, text):
