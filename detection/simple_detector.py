@@ -63,6 +63,32 @@ def _skin_ratio(hsv: np.ndarray) -> float:
     return float(np.count_nonzero(mask)) / (hsv.shape[0] * hsv.shape[1])
 
 
+def _torso_skin_ratio(hsv: np.ndarray, faces: list) -> float:
+    """Check skin density directly underneath detected faces (chest/torso area)."""
+    if not faces:
+        return 0.0
+        
+    mask = cv2.inRange(hsv, _LOWER_SKIN, _UPPER_SKIN)
+    max_torso_ratio = 0.0
+    frame_height, frame_width = hsv.shape[:2]
+    
+    for x, y, w, h in faces:
+        # Define torso box: below the face, slightly wider, spanning down 2.5x face height
+        tx1 = max(0, x - int(w * 0.25))
+        ty1 = min(frame_height, y + int(h * 0.9)) # start slightly above chin
+        tx2 = min(frame_width, x + int(w * 1.25))
+        ty2 = min(frame_height, y + int(h * 3.5))
+        
+        torso_area = (tx2 - tx1) * (ty2 - ty1)
+        if torso_area > 0:
+            torso_mask = mask[ty1:ty2, tx1:tx2]
+            skin_pixels = np.count_nonzero(torso_mask)
+            ratio = skin_pixels / float(torso_area)
+            max_torso_ratio = max(max_torso_ratio, ratio)
+            
+    return max_torso_ratio
+
+
 def _red_ratio(hsv: np.ndarray) -> float:
     m1 = cv2.inRange(hsv, _LOWER_RED1, _UPPER_RED1)
     m2 = cv2.inRange(hsv, _LOWER_RED2, _UPPER_RED2)
@@ -116,20 +142,41 @@ def _detect_faces(gray: np.ndarray) -> Tuple[List, List]:
 
 
 def _check_close_faces(faces: list, frame_height: int) -> bool:
-    """Return True if any two faces are dangerously close (potential kissing)."""
+    """Return True if any two faces overlap or are dangerously close (kissing)."""
     if len(faces) < 2:
         return False
-    tau = frame_height * 0.25
+        
     for i in range(len(faces)):
         for j in range(i + 1, len(faces)):
             x1, y1, w1, h1 = faces[i]
             x2, y2, w2, h2 = faces[j]
+            
+            # Center points
             cx1, cy1 = x1 + w1 / 2.0, y1 + h1 / 2.0
             cx2, cy2 = x2 + w2 / 2.0, y2 + h2 / 2.0
+            
+            # 1. Proximity check (relative to face size)
             dist = np.sqrt((cx1 - cx2) ** 2 + (cy1 - cy2) ** 2)
             avg_w = (w1 + w2) / 2.0
-            if dist < tau or dist < avg_w * DETECTOR_CONFIG["CLOSE_FACE_RATIO"]:
+            if dist < avg_w * DETECTOR_CONFIG["CLOSE_FACE_RATIO"]:
                 return True
+                
+            # 2. Bounding Box Intersection (IoU overlap)
+            # If face boxes physically intersect, they are extremely close
+            ix1 = max(x1, x2)
+            iy1 = max(y1, y2)
+            ix2 = min(x1 + w1, x2 + w2)
+            iy2 = min(y1 + h1, y2 + h2)
+            
+            if ix1 < ix2 and iy1 < iy2:
+                # Calculate intersection area ratio
+                inter_area = (ix2 - ix1) * (iy2 - iy1)
+                box1_area = w1 * h1
+                box2_area = w2 * h2
+                # If they overlap by more than 10% of the smallest face's area -> kissing
+                if inter_area > 0.10 * min(box1_area, box2_area):
+                    return True
+                    
     return False
 
 
@@ -159,6 +206,7 @@ def analyse_frame_cv(frame: np.ndarray, frame_number: int = 0) -> Dict:
     n_faces = len(all_faces)
 
     sr = _skin_ratio(hsv)
+    torso_sr = _torso_skin_ratio(hsv, all_faces)
     rr = _red_ratio(hsv)
     bv = _brightness(gray)
     blur = _blur_score(gray)
@@ -190,11 +238,21 @@ def analyse_frame_cv(frame: np.ndarray, frame_number: int = 0) -> Dict:
     # Skin signal
     skin_score = 0.0
     skin_tags = []
+    
+    # Torso skin (bare chest/shoulders) is the strongest indicator
+    if torso_sr > 0.45:
+        skin_score = 0.95
+        skin_tags.append("exposed_torso")
+    elif torso_sr > 0.25:
+        skin_score = max(skin_score, 0.70)
+        skin_tags.append("partial_torso_skin")
+        
+    # Global skin falls back
     if high_skin:
-        skin_score = 0.90
+        skin_score = max(skin_score, 0.90)
         skin_tags.append("high_skin_exposure")
     elif medium_skin and n_faces >= 1:
-        skin_score = 0.55
+        skin_score = max(skin_score, 0.55)
         skin_tags.append("medium_skin_exposure")
 
     # Motion/blur signal

@@ -403,13 +403,15 @@ class SafeVisionEngine(QThread):
             # ----------------------------------------------------------------
             # Stage 5 – Late fusion
             # ----------------------------------------------------------------
+            # We use max-based fusion instead of a weighted average.
+            # A weighted average suppresses independent signals (e.g., CV kiss score of 0.6 
+            # becomes 0.21 when multiplied by W_CV=0.35, failing to hit the 0.45 threshold).
+            # With max(), if ONNX *or* CV is highly confident, it triggers the skip.
             w = ENGINE_CONFIG
-            S = (
-                w["W_EFFICIENTNET"] * eff_score
-                + w["W_ONNX"]       * onnx_score
-                + w["W_CV"]         * cv_score
-                + w["W_BLUR"]       * blur_score
-            )
+            S = max(eff_score, onnx_score, cv_score)
+            
+            # Optionally add a small blur boost for shaky/action scenes
+            S = S + (blur_score * w.get("W_BLUR", 0.10))
             S = float(np.clip(S, 0.0, 1.0))
 
             # ----------------------------------------------------------------
