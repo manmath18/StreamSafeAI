@@ -30,6 +30,7 @@ class PlayerPanel(QWidget):
     frame_extracted = pyqtSignal(float, float, bool)  # score, fps, is_safe
     unsafe_detected = pyqtSignal(str)
     video_loaded = pyqtSignal(str) # file_path
+    skip_detail_updated = pyqtSignal(dict)  # rich skip telemetry dict
     
     def __init__(self):
         super().__init__()
@@ -45,6 +46,7 @@ class PlayerPanel(QWidget):
         # Connect AI engine signals
         self.ai_engine.stats_updated.connect(self.frame_extracted.emit)
         self.ai_engine.skip_requested.connect(self.handle_skip_request)
+        self.ai_engine.skip_detail_updated.connect(self.skip_detail_updated.emit)
         
         self.init_ui()
 

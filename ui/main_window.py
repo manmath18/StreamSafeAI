@@ -598,6 +598,7 @@ class MainWindow(QMainWindow):
         self.player_panel.unsafe_detected.connect(self.bottom_panel.log_event)
         self.player_panel.unsafe_detected.connect(self.right_sidebar.log_skip)
         self.player_panel.video_loaded.connect(self.right_sidebar.update_metadata)
+        self.player_panel.skip_detail_updated.connect(self.right_sidebar.update_skip_detail)
         self.preprocess_panel.log_message.connect(self.right_sidebar.log_batch)
         
         # Initialize default mode
